@@ -75,7 +75,7 @@ public partial class MainWindow : Window
         while (!gameState.GameOver)
         {
            
-            await Task.Delay(100);
+            await Task.Delay(70);
             gameState.Move();
             Draw();
         }
@@ -102,6 +102,7 @@ public partial class MainWindow : Window
         Image[,] images = new Image[rows, cols];
         GameGrid.Rows =rows;
         GameGrid.Columns = cols;
+        GameGrid.Width = GameGrid.Height * (cols / (double)rows);
 
         for (int r = 0; r < rows; r++)
         {
