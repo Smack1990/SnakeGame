@@ -24,62 +24,138 @@ public partial class MainWindow : Window
         { GridValue.Food, Images.Food }
     };
 
+    private readonly int rows = 40, cols = 40;
+    private readonly Image[,] gridImages;
+    private GameState gameState;
+    public Player currentPlayer;
+    private bool gameRunning;
+    public MainWindow()
+    {
+        InitializeComponent();
+        gridImages = SetupGrid();
+        gameState = new GameState(rows, cols);
+
+       
+
+        NamePanel.Visibility = Visibility.Visible;
+        NameInput.Focus();
+        Keyboard.Focus(NameInput);
+    }
+
+    private void StartGame_Click(object sender, RoutedEventArgs e)
+    {
+        // Retrieve the player name from the TextBox
+        string playerName = NameInput.Text.Trim();
+        DisplayHighscores();
+
+
+        if (string.IsNullOrEmpty(playerName))
+        {
+            // Show a message if the name is empty and prevent starting the game
+            MessageBox.Show("Please enter your name to start the game.");
+            return;
+        }
+
+        // Initialize currentPlayer with the entered name and a starting score of 0
+        currentPlayer = new Player(playerName, 0);
+
+        // Read high scores from JSON after currentPlayer is initialized
+        currentPlayer.ReadHighscoresFromJson();
+
+        // Hide the name entry panel and show the overlay with start prompt
+        NamePanel.Visibility = Visibility.Hidden;
+        Overlay.Visibility = Visibility.Visible;
+        OverlayText.Text = "Press any key to start"; // Update overlay text
+
+        // Set focus back to the Window to capture key events
+        this.Focus();
+
+        gameRunning = false; // Allow game to start on key press
+    }
+
     private async Task RunGame()
     {
         Draw();
         await ShowCountDown();
         Overlay.Visibility = Visibility.Hidden;
+        DisplayHighscores();
         await GameLoop();
         await ShowGameOver();
+
+        // Save the current player's score to the high scores list
+        if (currentPlayer != null) // Double-check that currentPlayer is not null
+        {
+            currentPlayer.AddScore(currentPlayer.Name, gameState.Score);
+        }
+
         gameState = new GameState(rows, cols);
     }
+
+
+
+
+    private void DisplayHighscores()
+    {
+        if (currentPlayer != null)
+        {
+            var topScores = currentPlayer.GetSortedHighscores()
+                                         .Take(5) // Limit to top 5 entries
+                                         .Select(entry => $"{entry.Key}: {entry.Value}")
+                                         .ToList();
+
+            HighscoreList.ItemsSource = topScores; // Now this will work within MainWindow
+        }
+    }
+
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Overlay.Visibility == Visibility.Visible)
+        if (NamePanel.Visibility == Visibility.Visible)
         {
+            if (NameInput.IsFocused) return;  // Allow key input to the TextBox
+
             e.Handled = true;
+            return;
         }
 
         if (!gameRunning)
         {
             gameRunning = true;
+            Overlay.Visibility = Visibility.Hidden;
             await RunGame();
             gameRunning = false;
         }
     }
+
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (gameState.GameOver)
-        {
-            return;
-        }
+        if (gameState.GameOver) return;
+
         switch (e.Key)
         {
-            case Key.Left:
-                gameState.ChangeDirection(Direction.Left);
-                break;
-            case Key.Right:
-                gameState.ChangeDirection(Direction.Right);
-                break;
-            case Key.Up:
-                gameState.ChangeDirection(Direction.Up);
-                break;
-            case Key.Down:
-                gameState.ChangeDirection(Direction.Down);
-                break;
+            case Key.Left: gameState.ChangeDirection(Direction.Left); break;
+            case Key.Right: gameState.ChangeDirection(Direction.Right); break;
+            case Key.Up: gameState.ChangeDirection(Direction.Up); break;
+            case Key.Down: gameState.ChangeDirection(Direction.Down); break;
         }
     }
 
     private async Task GameLoop()
     {
+        int delay = 120;
         while (!gameState.GameOver)
         {
-           
-            await Task.Delay(70);
+            await Task.Delay(delay);
             gameState.Move();
             Draw();
+
+            if (gameState.Score > currentPlayer.Score)
+            {
+                currentPlayer.Score = gameState.Score;
+                delay = Math.Max(20, delay - 3);
+            }
         }
     }
+
     private readonly Dictionary<Direction, int> dirToRotation = new()
     {
         {Direction.Up, 0 },
@@ -87,16 +163,7 @@ public partial class MainWindow : Window
         { Direction.Down, 180 },
         { Direction.Left, 270 }
         };
-    private readonly int rows = 25, cols = 25;
-    private readonly Image[,] gridImages;
-    private GameState gameState;
-    private bool gameRunning;
-    public MainWindow()
-    {
-        InitializeComponent();
-        gridImages = SetupGrid();
-        gameState = new GameState(rows, cols);
-    }
+
     private Image[,] SetupGrid()
     {
         Image[,] images = new Image[rows, cols];
@@ -177,4 +244,7 @@ public partial class MainWindow : Window
         Overlay.Visibility = Visibility.Visible;
         OverlayText.Text = "PRESS ANY KEY TO START A NEW GAME";
     }
+
+
+  
 }
